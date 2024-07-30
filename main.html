@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>FieldMate</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    *{
+      font-family: Montserrat;
+      font-size: 14px;
+    }
+    img{
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      width: 80%;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      position: fixed;
+      height: calc(100vh); 
+      width: calc(100vw); 
+      margin-top: 10px; /* Add some margin at the top to create space between the floating box and the map */
+      margin-right: 10px; /* Add some margin at the right to create space between the floating box and the map */
+    }
+    #floating-box {
+      position: absolute;
+      top: 30px;
+      right: 35px;
+      width: 350px; /* Set the width of the box */
+      background-color: white;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    #floating-box-1 {
+      position: absolute;
+      top: 1050px;
+      right: 35px;
+      width: 350px; /* Set the width of the box */
+      background-color: transparent;
+      padding: 10px;
+      border-radius: 10px;
+
+    }
+    #zoneDetails,#schedulingTasks1{
+      margin: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+    }
+    #floating-box label {
+      display: block;
+      margin-bottom: 5px;
+      padding: 8px;
+    }
+    #floating-box input[type="text"],
+    #floating-box select {
+      width: 90%;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    #floating-box input[type="button"] {
+      width: 30%;
+      padding: 8px;
+      background-color: #768f5a;
+      color: white;
+      text-align: center;
+      margin: 20px 3px;
+      border: none;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+    #floating-box input[type="button"]:hover {
+      background-color: #49602f;
+      transition: 0.3s;
+    }
+    #floating-box-1 input[type="button"] {
+      width: 60%;
+      padding: 8px;
+      background-color: #768f5a;
+      color: white;
+      text-align: center;
+      margin-left: 70px;
+      border: none;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+    #floating-box-1 input[type="button"]:hover {
+      background-color: #49602f;
+      transition: 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="floating-box">
+    <img src="./images/LOGO_G.png" alt="">
+    <label for="zoneDetails" id="zoneDetails">Zone Details</label>
+    <label for="zoneName" id="zoneName">Name of Zone:</label>
+    <input type="text" id="zoneName1" />
+    <label for="plantType" id="plantType">Type of Plant:</label>
+    <input type="text" id="plantType1" />
+    <label for="zoneColor" id="zoneColor">Color of Zone:</label>
+    <input type="color" id="zoneColor1" />
+	  <label for="schedulingTasks" id="schedulingTasks1">Scheduling Tasks:</label>
+    <label for="datePlanted" id="datePlanted">Date Planted:</label>
+    <input type="date" id="datePlanted1" />
+    <label for="lastWatered" id="lastWatered">Last Watered:</label>
+    <input type="date" id="lastWatered1" />
+    <label for="lastFertilized" id="lastFertilized">Last Fertilized:</label>
+    <input type="date" id="lastFertilized1" />
+    <label for="possibleHarvestDate" id="possibleHarvestDate">Possible Harvest Date:</label>
+    <input type="date" id="possibleHarvestDate1" />
+    <label for="comments"  id="comments">Comments:</label>
+    <textarea id="comments1"></textarea>
+    </br>
+    <input type="button" value="Save" id="saveButton" />
+    <input type="button" value="Delete" id="deleteButton" />
+    <input type="button" value="Cancel" id="cancelButton" />
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="./geohash.js"></script>
+
+  <script>
+    var activeGrid=[];
+    var data = {
+      zones: []
+    };
+ // Function to generate geohash from latitude and longitude
+  function generateGeohash(lat, lon) {
+    var precision = 9; // Set the desired precision level
+    return encodeGeoHash(lat, lon, precision); 
+  }
+
+  window.onload = function() {
+    var storedData = localStorage.getItem("fieldmateData");
+    if (storedData) {
+      data = JSON.parse(storedData);
+    }
+  }
+
+  function saveData() {
+    // Get input values
+    var zoneName = document.getElementById("zoneName1").value;
+    var plantType = document.getElementById("plantType1").value;
+    var zoneColor = document.getElementById("zoneColor1").value;
+    var datePlanted = document.getElementById("datePlanted1").value;
+    var lastWatered = document.getElementById("lastWatered1").value;
+    var lastFertilized = document.getElementById("lastFertilized1").value;
+    var possibleHarvestDate = document.getElementById("possibleHarvestDate1").value;
+    var comments = document.getElementById("comments1").value;
+
+    // Add new zone to data object
+    var zone = {
+      zoneName: zoneName,
+      plantType: plantType,
+      zoneColor: zoneColor,
+      datePlanted: datePlanted,
+      lastWatered: lastWatered,
+      lastFertilized: lastFertilized,
+      possibleHarvestDate: possibleHarvestDate,
+      comments: comments,
+      grid: activeGrid
+    };
+    
+    data.zones.push(zone);
+    console.log('Data saved to local storage:', data);
+    // Save data to local storage
+    localStorage.setItem("fieldmateData", JSON.stringify(data));
+  }
+
+document.getElementById('saveButton').addEventListener('click', saveData);
+
+    // Create a map instance with OpenStreetMap tile layer
+    var map = L.map('map').fitWorld();
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Request access to user's location
+    map.locate({setView: true, maxZoom: 16, zoom: 18}); // Set the zoom level to 18
+
+    // Handle location found event
+    map.on('locationfound', function(e) {
+      var lat = e.latlng.lat;
+      var lon = e.latlng.lng;
+      geohash = generateGeohash(lat, lon);
+      var startPoint = L.latLng(lat, lon);
+      // Draw grids on the map
+      drawGrids(startPoint);
+      map.setView(startPoint, 16);
+    });
+
+    // Handle location error event
+    map.on('locationerror', function(e) {
+      alert('Failed to get location: ' + e.message);
+    });
+
+	function drawGrids(startPoint) {
+  var bounds = map.getBounds(); // Get the bounding box of the map
+  var gridSize = 0.001; // Grid size in degrees, you can adjust this to change the size of the grids
+  var numGrids = 50; // Number of grids to be drawn in both horizontal and vertical directions
+  var gridColor = '#808080'; // Color of the grids, you can change this to your desired color
+  var highlightColor = '#00ff00'; // Color to highlight the current grid
+  var grids = L.layerGroup().addTo(map); // Layer group to store grids
+
+  // Get the current lat and lon from the startPoint
+  var lat = startPoint.lat;
+  var lon = startPoint.lng;
+
+  // Calculate the starting lat and lon for the grids
+  var startLat = lat - (Math.floor(numGrids / 2) * gridSize);
+  var startLon = lon - (Math.floor(numGrids / 2) * gridSize);
+
+  // Loop through and draw grids
+  for (var i = 0; i < numGrids; i++) {
+    for (var j = 0; j < numGrids; j++) {
+      var gridBounds = L.latLngBounds(
+        L.latLng(startLat + i * gridSize, startLon + j * gridSize),
+        L.latLng(startLat + (i + 1) * gridSize, startLon + (j + 1) * gridSize)
+      );
+
+      var grid;
+      if (i === Math.floor(numGrids / 2) && j === Math.floor(numGrids / 2)) {
+        // Highlight the current grid with green color
+        grid = L.rectangle(gridBounds, { color: highlightColor, weight: 1, fillOpacity: 0.4 }).addTo(grids);
+      } else {
+        grid = L.rectangle(gridBounds, { color: gridColor, weight: 1, fillOpacity: 0.1 }).addTo(grids);
+      }
+      grid.on('click', onGridClick); // Call the onGridClick function for each grid
+      // Add click event to each grid
+      grid.on('click', function(e) {
+        var clickedGrid = e.target;
+        
+        // You can access the latlng of the clicked grid using clickedGrid.getBounds().getCenter()
+        // Perform further actions as needed
+      });
+    }
+  }
+}
+
+
+// Function to show the floating box for input
+function showFloatingBox(lat, lon) {
+  var zoneNameInput = document.getElementById('zoneName1');
+  var plantTypeInput = document.getElementById('plantType1');
+  var zoneColorInput = document.getElementById('zoneColor1');
+  var saveButton = document.getElementById('saveButton1');
+
+  // Set the input values to empty
+  zoneNameInput.value = '';
+  plantTypeInput.value = '';
+  zoneColorInput.value = '#000000';
+
+  // Show the floating box
+  document.getElementById('floating-box').style.display = 'block';
+
+  // Set the save button click event
+  saveButton.onclick = function() {
+    var zoneName = zoneNameInput.value;
+    var plantType = plantTypeInput.value;
+    var zoneColor = zoneColorInput.value;
+    
+
+    // Hide the floating box
+    document.getElementById('floating-box').style.display = 'none';
+
+    // Create a new marker with the input values
+    var marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+    marker.bindPopup(
+      'Zone Name: ' + zoneName + '<br>' +
+      'Plant Type: ' + plantType + '<br>' +
+      'Zone Color: ' + zoneColor
+    ).openPopup();
+
+    // Add dragend event to the marker to update the popup content
+    marker.on('dragend', function(e) {
+      var newLat = e.target._latlng.lat.toFixed(6);
+      var newLon = e.target._latlng.lng.toFixed(6);
+      marker.setPopupContent(
+        'Zone Name: ' + zoneName + '<br>' +
+        'Plant Type: ' + plantType + '<br>' +
+        'Zone Color: ' + zoneColor + '<br>' +
+        'Latitude: ' + newLat + '<br>' +
+        'Longitude: ' + newLon
+      );
+    });
+  };
+}
+// Array to store selected grids
+var selectedGrids = [];
+console.log(selectedGrids);
+// Handle click event on grids
+function onGridClick(e) {
+  // Get the clicked grid
+  var grid = e.target;
+
+  // Check if the grid is already selected
+  if (selectedGrids.includes(grid)) {
+    // Grid is already selected, so deselect it
+    grid.setStyle({ fillOpacity: 0.1 }); // Reset the fill opacity
+    selectedGrids.splice(selectedGrids.indexOf(grid), 1); // Remove the grid from the selected grids array
+  } else {
+    // Grid is not selected, so select it
+    grid.setStyle({ fillOpacity: 0.5 }); // Set the fill opacity to 0.5 to indicate selection
+    selectedGrids.push(grid); // Add the grid to the selected grids array
+  }
+}
+
+// Update the values in the floating box when the save button is clicked
+document.getElementById('saveButton').addEventListener('click', function() {
+  // Get the values from the floating box
+  var zoneName = document.getElementById('zoneName1').value;
+  var plantType = document.getElementById('plantType1').value;
+  var zoneColor = document.getElementById('zoneColor1').value;
+  
+  // Loop through the selected grids and update their properties
+  for (var i = 0; i < selectedGrids.length; i++) {
+	var grid = selectedGrids[i];
+  activeGrid[i]=grid; //delete lang to afterr
+	grid.options.zoneName = zoneName;
+	grid.options.plantType = plantType;
+	grid.setStyle({ color: zoneColor });
+  }
+  //trace active grid value
+  for(let i=0;i<selectedGrids.length;i++){
+    console.log('['+ i +'] Active Grid: ' + activeGrid[i] + ' : ' + selectedGrids[i]);
+  }
+  // Clear the selected grids array
+  selectedGrids = [];
+});
+document.getElementById('saveButton').addEventListener('click', function() {
+
+  var dataNew = JSON.parse(localStorage.getItem('fieldmateData'));
+
+  console.log('Zone Name:', dataNew.zones[dataNew.zones.length - 1].zoneName);
+  console.log('Plant Type:', dataNew.zones[dataNew.zones.length - 1].plantType);
+  console.log('Zone Color:', dataNew.zones[dataNew.zones.length - 1].zoneColor);
+  console.log('Date Planted:', dataNew.zones[dataNew.zones.length - 1].datePlanted);
+  console.log('Last Watered:', dataNew.zones[dataNew.zones.length - 1].lastWatered);
+  console.log('Last Fertilized:', dataNew.zones[dataNew.zones.length - 1].lastFertilized);
+  console.log('Possible Harvest Date:', dataNew.zones[dataNew.zones.length - 1].possibleHarvestDate);
+  console.log('Comments:', dataNew.zones[dataNew.zones.length - 1].comments);
+  console.log('Grid:',dataNew.zones[dataNew.zones.length - 1].grid);
+
+  console.log(dataNew);
+
+  //localStorage.clear();
+});
+
+
+
+</script>
+</body>
+</html>
